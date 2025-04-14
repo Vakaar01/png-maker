@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Smart Compass</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      background: #eef2f3;
+    }
+    h1 {
+      margin: 20px 0;
+      color: #2c3e50;
+    }
+    input, button {
+      padding: 10px;
+      font-size: 16px;
+      margin: 10px;
+    }
+    button {
+      background: #3498db;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    .compass-box {
+      margin-top: 30px;
+      position: relative;
+      display: inline-block;
+    }
+    #compass {
+      width: 250px;
+      transition: transform 0.2s ease-in-out;
+    }
+    #arrow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 100px;
+      height: 2px;
+      background: red;
+      transform-origin: left center;
+    }
+    .info {
+      margin-top: 15px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Compass to Any Location</h1>
+
+<input type="text" id="locationInput" placeholder="Search Target Location...">
+<button onclick="searchLocation()">Set Target</button>
+
+<br><br>
+<button onclick="startCompass()">Start Compass</button>
+
+<div class="compass-box">
+  <img src="compass.png" id="compass" alt="Compass">
+  <div id="arrow"></div>
+</div>
+
+<div class="info">
+  <p id="headingDisplay">Heading: 0°</p>
+  <p id="targetDisplay">Target: Not set</p>
+  <p id="status">Click "Start Compass" to begin</p>
+</div>
+
+<script>
+let userLat, userLon;
+let targetLat, targetLon;
+
+// Step 1: Get user location
+function getLocation() {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(pos => {
+      userLat = pos.coords.latitude;
+      userLon = pos.coords.longitude;
+      document.getElementById("status").textContent = `Your location: ${userLat.toFixed(4)}, ${userLon.toFixed(4)}`;
+      resolve();
+    }, err => {
+      document.getElementById("status").textContent = "Location access denied!";
+      reject(err);
+    });
+  });
+}
+
+// Step 2: Ask sensor permission (for iOS mostly)
+function askSensorPermission() {
+  return new Promise((resolve, reject) => {
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission()
+        .then(permissionState => {
+          if (permissionState === 'granted') {
+            resolve();
+          } else {
+            alert("Sensor permission denied!");
+            reject();
+          }
+        })
+        .catch(err => {
+          alert("Sensor permission error!");
+          reject(err);
+        });
+    } else {
+      // Android or already granted
+      resolve();
+    }
+  });
+}
+
+// Final Step: Start everything
+function startCompass() {
+  Promise.all([getLocation(), askSensorPermission()]).then(() => {
+    window.addEventListener("deviceorientation", updateCompass, true);
+    document.getElementById("status").textContent = "Compass is active!";
+  });
+}
+
+// Calculate direction
+function getBearing(lat1, lon1, lat2, lon2) {
+  const toRad = deg => deg * Math.PI / 180;
+  const toDeg = rad => rad * 180 / Math.PI;
+
+  const dLon = toRad(lon2 - lon1);
+  const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+  const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+            Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+  const brng = Math.atan2(y, x);
+  return (toDeg(brng) + 360) % 360;
+}
+
+// Search target location
+function searchLocation() {
+  const query = document.getElementById("locationInput").value;
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.length > 0) {
+        targetLat = parseFloat(data[0].lat);
+        targetLon = parseFloat(data[0].lon);
+        document.getElementById("targetDisplay").textContent = `Target: ${query} (${targetLat.toFixed(3)}, ${targetLon.toFixed(3)})`;
+      } else {
+        document.getElementById("targetDisplay").textContent = "Target not found!";
+      }
+    })
+    .catch(() => {
+      document.getElementById("targetDisplay").textContent = "Error fetching location";
+    });
+}
+
+// Update compass and arrow
+function updateCompass(event) {
+  let heading = event.alpha;
+  if (typeof event.webkitCompassHeading !== "undefined") {
+    heading = event.webkitCompassHeading;
+  }
+
+  if (heading !== null && !isNaN(heading)) {
+    document.getElementById("headingDisplay").textContent = `Heading: ${Math.round(heading)}°`;
+
+    if (targetLat !== undefined && userLat !== undefined) {
+      const bearing = getBearing(userLat, userLon, targetLat, targetLon);
+      const diff = (bearing - heading + 360) % 360;
+      document.getElementById("compass").style.transform = `rotate(${-heading}deg)`;
+      document.getElementById("arrow").style.transform = `rotate(${diff}deg)`;
+    }
+  }
+}
+</script>
+
+</body>
+</html>
