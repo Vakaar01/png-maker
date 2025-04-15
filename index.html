@@ -40,7 +40,8 @@
       width: 100px;
       height: 2px;
       background: red;
-      transform-origin: 0% 50%;
+      transform-origin: left center;
+      transition: transform 0.2s ease-in-out;
     }
     .info {
       margin-top: 15px;
@@ -72,7 +73,6 @@
 let userLat, userLon;
 let targetLat, targetLon;
 
-// Step 1: Get user location
 function getLocation() {
   return new Promise((resolve, reject) => {
     navigator.geolocation.getCurrentPosition(pos => {
@@ -87,7 +87,6 @@ function getLocation() {
   });
 }
 
-// Step 2: Ask sensor permission
 function askSensorPermission() {
   return new Promise((resolve, reject) => {
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -110,7 +109,6 @@ function askSensorPermission() {
   });
 }
 
-// Start Compass
 function startCompass() {
   Promise.all([getLocation(), askSensorPermission()]).then(() => {
     window.addEventListener("deviceorientationabsolute" in window ? "deviceorientationabsolute" : "deviceorientation", updateCompass, true);
@@ -118,7 +116,6 @@ function startCompass() {
   });
 }
 
-// Calculate bearing
 function getBearing(lat1, lon1, lat2, lon2) {
   const toRad = deg => deg * Math.PI / 180;
   const toDeg = rad => rad * 180 / Math.PI;
@@ -131,7 +128,6 @@ function getBearing(lat1, lon1, lat2, lon2) {
   return (toDeg(brng) + 360) % 360;
 }
 
-// Search target
 function searchLocation() {
   const query = document.getElementById("locationInput").value;
   fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
@@ -150,23 +146,22 @@ function searchLocation() {
     });
 }
 
-// Update compass
 function updateCompass(event) {
   let heading;
   if (typeof event.webkitCompassHeading !== "undefined") {
-    heading = event.webkitCompassHeading; // iOS
+    heading = event.webkitCompassHeading;
   } else {
-    heading = 360 - event.alpha; // Android
+    heading = 360 - event.alpha;
   }
 
   if (heading !== null && !isNaN(heading)) {
     document.getElementById("headingDisplay").textContent = `Heading: ${Math.round(heading)}°`;
+    document.getElementById("compass").style.transform = `rotate(${-heading}deg)`;
 
     if (typeof targetLat !== "undefined" && typeof userLat !== "undefined") {
       const bearing = getBearing(userLat, userLon, targetLat, targetLon);
-      const angle = (bearing - heading + 360) % 360;
-      document.getElementById("compass").style.transform = `rotate(${-heading}deg)`;
-      document.getElementById("arrow").style.transform = `rotate(${angle}deg) translateX(-50%)`;
+      const angleToTarget = (bearing - heading + 360) % 360;
+      document.getElementById("arrow").style.transform = `rotate(${angleToTarget}deg)`;
     }
   }
 }
