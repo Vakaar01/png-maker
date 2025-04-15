@@ -161,7 +161,9 @@ function updateCompass(event) {
     if (typeof targetLat !== "undefined" && typeof userLat !== "undefined") {
       const bearing = getBearing(userLat, userLon, targetLat, targetLon);
       const angleToTarget = (bearing - heading + 360) % 360;
-      document.getElementById("arrow").style.transform = `rotate(${angleToTarget}deg)`;
+
+      // Fixed: Red arrow now points in correct direction
+      document.getElementById("arrow").style.transform = `rotate(${(angleToTarget + 180) % 360}deg)`;
     }
   }
 }
